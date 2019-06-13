@@ -8,8 +8,8 @@ import torch
 
 def get_device():
     if torch.cuda.is_available():
-        return torch.device("cuda:0")
+        return torch.device("cuda:0"), torch.device("cuda:1")
     else:
-        return torch.device("cpu")
+        return torch.device("cpu"), torch.device("cpu")
 
-device = get_device()
+device, _ = get_device()
