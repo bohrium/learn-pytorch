@@ -5,6 +5,7 @@
 '''
 
 import torch
+from functools import reduce
 
 def get_device():
     if torch.cuda.is_available():
@@ -13,3 +14,5 @@ def get_device():
         return torch.device("cpu"), torch.device("cpu")
 
 device, _ = get_device()
+
+prod = lambda seq: reduce(lambda a,b:a*b, seq, 1) 
