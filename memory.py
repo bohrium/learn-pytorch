@@ -1,19 +1,29 @@
 ''' author: samtenka
-    change: 2019-06-12
-    create: 2019-06-11
-    descrp: simple example of mnist training
+    change: 2019-06-14
+    create: 2019-06-14
+    descrp: Demonstration of subtlety of pytorch memory freeing. 
+            Run and compare the following:
+                python memory.py YESLEAK
+                python memory.py NOLEAK
+            The only difference is a use of .detach()!
 '''
 
 
-from utils import device, prod, secs_endured, megs_alloced, CC
+from utils import device, prod, secs_endured, megs_alloced
 
 import numpy as np
 import torch
 from torch import conv2d, matmul
-from torch.autograd import grad as nabla
 from torch.nn.functional import relu, log_softmax, nll_loss
-
 from torchvision import datasets, transforms
+
+
+import sys
+assert len(sys.argv)==2 and sys.argv[1] in ('NOLEAK', 'YESLEAK'), ( 
+    'please specify one command line argument: NOLEAK or YESLEAK'  
+)
+LEAK_FLAG = sys.argv[1]
+
 
 BTCH = 6
 SIDE = 28
@@ -63,32 +73,24 @@ class LeClassifier():
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(device), target.to(device)
             loss = self.loss_at(data, target)
-            grad = nabla(loss, LC.weights, create_graph=True)[0]
-            self.weights -= learning_rate * grad.detach()
+            grad = torch.autograd.grad(
+                loss, LC.weights,
+                create_graph=True
+            )[0]
+            self.weights -= learning_rate * (
+                grad if LEAK_FLAG=='YESLEAK' else grad.detach()
+            )
         
             losses.append(float(loss.item()))
 
             if (batch_idx+1) % 10: continue
-            print(CC+'@^ '+' '*120)
-            print(CC+'@^ {:.0f}% completed\t batch perplexity: @B {:.2f} @W \t @R {:.2f} @W megs allocated'.format(
+            print('\033[1A'+' '*120)
+            print('\033[1A{:.0f}% completed\t batch perplexity: {:.2f}\t {:.2f} megs allocated'.format(
                 100.0 * batch_idx / len(train_loader),
                 np.exp(sum(losses)/len(losses)),
                 megs_alloced()
             ))
             losses = []
-
-    def test(self, test_loader):
-        test_losses = []
-        with torch.no_grad():
-            for data, target in test_loader:
-                data, target = data.to(device), target.to(device)
-                test_losses.append(self.loss_at(data, target))
-
-        print(CC+'test perplexity: @G {:.3f} @W on {} samples'.format(
-            np.exp(sum(test_losses)/len(test_losses)),
-            len(test_loader.dataset),
-        ))
-
 
 def get_data_loader(train=True):
     return torch.utils.data.DataLoader(                                                     
@@ -98,9 +100,6 @@ def get_data_loader(train=True):
     )
 
 LC = LeClassifier()
-train_loader, test_loader = (get_data_loader(train_flag) for train_flag in [True, False])
-for epoch_index, learning_rate in enumerate([1.0, 0.8, 0.6]):
-    LC.train_for_one_epoch(train_loader, learning_rate)
-    LC.test(test_loader)
-    print(CC+'average @Y {:.2f} @W seconds per epoch'.format(secs_endured()/(epoch_index+1)))
-    print('')
+train_loader = get_data_loader()
+LC.train_for_one_epoch(train_loader, learning_rate=0.1)
+print('epoch took {:.2f} seconds'.format(secs_endured()))

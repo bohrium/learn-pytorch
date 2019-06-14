@@ -9,7 +9,6 @@ from time import time
 
 import numpy as np
 import torch
-from torchvision import datasets, transforms
 
 weights = torch.autograd.Variable(torch.ones(3, dtype=torch.float, device=device), requires_grad=True)
 
